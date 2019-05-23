@@ -8,7 +8,7 @@ from gensim.models import Word2Vec
 class Dataset:
     def __init__(self, read_model=True):
         self.raw_data = self.data_preprocess(config.path+"train.csv")
-        self.train_y = [{"Negative": 0, "Positive": 1}[label] for label in self.raw_data["label"].values]
+        self.train_y = np.array([{"Negative": 0, "Positive": 1}[label] for label in self.raw_data["label"].values])
         self.train_X = [sentence for sentence in self.raw_data["review"].values]
         self.test_X = [re.split(r'\W+', sentence) for sentence in pd.read_csv(config.path+"test.csv")["review"].values]
         if not read_model:
@@ -50,20 +50,20 @@ class Dataset:
 
     @staticmethod
     def padding_sentences(sentences, length):
-        paddles = []
-        for sentence in sentences:
+        paddles = np.zeros((len(sentences), length * config.embeddingsize))
+        for i, sentence in enumerate(sentences):
             if length > sentence.shape[0]:
                 paddle = np.concatenate((sentence, np.zeros((length-sentence.shape[0], config.embeddingsize))), axis=0)
-                paddles.append(paddle)
+                paddles[i] = np.reshape(paddle, (1, -1))
             elif length < sentence.shape[0]:
                 paddle = sentence[:length]
-                paddles.append(paddle)
+                paddles[i] = np.reshape(paddle, (1, -1))
             else:
-                paddles.append(sentence)
+                paddles[i] = np.reshape(sentence, (1, -1))
         return paddles
 
     def word_vocab(self, path):
-        model = Word2Vec(list(self.raw_data["review"].values) + self.test_X, iter=10000, size=config.embeddingsize, workers=4, sg=1, hs=1)
+        model = Word2Vec(list(self.raw_data["review"].values) + self.test_X, iter=config.word2vecinter, size=config.embeddingsize, workers=4)
         model.save(path)
 
 

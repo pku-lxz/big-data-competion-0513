@@ -2,8 +2,9 @@ from model_lgbm import modelLightGBM
 from dataset import Dataset
 import os
 
+
 def main():
-    data = Dataset()
+    data = Dataset(read_model=False)
     gbm = modelLightGBM()
     gbm.train(data.train, data.train_y)
 
