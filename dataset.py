@@ -7,10 +7,10 @@ from gensim.models import Word2Vec
 
 class Dataset:
     def __init__(self, read_model=True):
-        self.raw_data = self.data_preprocess(config.path+"train.csv")
+        self.raw_data = self.data_preprocess(config.train_path)
         self.train_y = np.array([{"Negative": 0, "Positive": 1}[label] for label in self.raw_data["label"].values])
         self.train_X = [sentence for sentence in self.raw_data["review"].values]
-        self.test_X = [re.split(r'\W+', sentence) for sentence in pd.read_csv(config.path+"test.csv")["review"].values]
+        self.test_X = [re.split(r'\W+', sentence) for sentence in pd.read_csv(config.test_path)["review"].values]
         if not read_model:
             self.word_vocab(config.model_path)
         self.model = Word2Vec.load(config.model_path)
@@ -50,20 +50,20 @@ class Dataset:
 
     @staticmethod
     def padding_sentences(sentences, length):
-        paddles = np.zeros((len(sentences), length * config.embeddingsize))
+        paddles = np.zeros((len(sentences), length, config.embeddingsize))
         for i, sentence in enumerate(sentences):
             if length > sentence.shape[0]:
                 paddle = np.concatenate((sentence, np.zeros((length-sentence.shape[0], config.embeddingsize))), axis=0)
-                paddles[i] = np.reshape(paddle, (1, -1))
+                paddles[i, :, :] = paddle
             elif length < sentence.shape[0]:
                 paddle = sentence[:length]
-                paddles[i] = np.reshape(paddle, (1, -1))
+                paddles[i, :, :] = paddle
             else:
-                paddles[i] = np.reshape(sentence, (1, -1))
+                paddles[i, :, :] = sentence
         return paddles
 
     def word_vocab(self, path):
-        model = Word2Vec(list(self.raw_data["review"].values) + self.test_X, iter=config.word2vecinter, size=config.embeddingsize, workers=4)
+        model = Word2Vec(list(self.raw_data["review"].values) + self.test_X, iter=config.word2vec_inter, size=config.embeddingsize, workers=4)
         model.save(path)
 
 

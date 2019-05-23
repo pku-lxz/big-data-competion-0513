@@ -2,6 +2,7 @@ import lightgbm as lgb
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
 
+
 class modelLightGBM:
 
     def __init__(self, lr=0.001, leave=8):
@@ -41,6 +42,6 @@ class modelLightGBM:
                             verbose_eval=2500)
 
             print('Start predicting...')
-            predict_y += gbm.predict(X_test)
+            predict_y += gbm.predict(X_test)/kfold
         return predict_y
 
