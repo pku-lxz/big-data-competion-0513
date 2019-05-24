@@ -1,5 +1,5 @@
 from model_lgbm import modelLightGBM
-from dataset import Dataset
+from data_word2vec import Dataset as dw2v
 import os
 import pandas as pd
 from common import config
@@ -24,7 +24,7 @@ class PredictProbilityOut:
 
 def main():
     predict = PredictProbilityOut()
-    data = Dataset(read_model=False)
+    data = dw2v(read_model=False)
     print("#########LightGBM Prediction start!#########")
     gbm = modelLightGBM()
     predict.update(gbm.train(data.train, data.train_y, data.test))
