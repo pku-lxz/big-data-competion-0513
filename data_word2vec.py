@@ -3,8 +3,6 @@ from common import config
 import re
 import numpy as np
 from gensim.models import Word2Vec
-import emoji
-
 
 class Dataset:
     def __init__(self, read_model=True):

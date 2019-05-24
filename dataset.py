@@ -2,7 +2,6 @@ import pandas as pd
 from common import config
 import re
 import numpy as np
-import emoji
 
 
 class Dataset:
@@ -12,8 +11,8 @@ class Dataset:
         self.raw_data = self.data_preprocess(config.train_path)
         self.y = np.array([{"Negative": 0, "Positive": 1}[label] for label in self.raw_data["label"].values])
         self.dic = self.vocab_dict()
-        self.X = [self.convert_data(x, self.dic) for x in self.participle([sentence for sentence in self.raw_data["review"].values])]
-        self.test = [self.convert_data(x, self.dic) for x in self.participle([re.split(self.pattern, sentence) for sentence in pd.read_csv(config.test_path)["review"].values])]
+        self.X = self.padding_sentences([self.convert_data(x, self.dic) for x in self.participle([sentence for sentence in self.raw_data["review"].values])], config.padding_size)
+        self.test = self.padding_sentences([self.convert_data(x, self.dic) for x in self.participle([re.split(self.pattern, sentence) for sentence in pd.read_csv(config.test_path)["review"].values])], config.padding_size)
 
     def data_preprocess(self, path):
         with open(path) as f:
@@ -53,17 +52,17 @@ class Dataset:
         return data
 
     @staticmethod
-    def padding_sentences(sentences, length, embedding_size):
-        paddles = np.zeros((len(sentences), length, embedding_size))
+    def padding_sentences(sentences, length):
+        paddles = np.zeros((len(sentences), length))
         for i, sentence in enumerate(sentences):
             if length > sentence.shape[0]:
-                paddle = np.concatenate((sentence, np.zeros((length-sentence.shape[0], embedding_size))), axis=0)
-                paddles[i, :, :] = paddle
+                paddle = np.concatenate((sentence, np.zeros((length - sentence.shape[0]))), axis=0)
+                paddles[i, :] = paddle
             elif length < sentence.shape[0]:
                 paddle = sentence[:length]
-                paddles[i, :, :] = paddle
+                paddles[i, :] = paddle
             else:
-                paddles[i, :, :] = sentence
+                paddles[i, :] = sentence
         return paddles
 
     @staticmethod
@@ -79,8 +78,23 @@ class Dataset:
             new_sentences.append([char for char in new_sentence if char != " "])
         return new_sentences
 
+    def one_batch_train(self, shuffle=True):
+        """
+            Generates a batch iterator for a dataset.
+            """
+        num_batches_per_epoch = int((config.train_size - 1) / config.batch_size) + 1
+        for epoch in range(config.epochs):
+            # Shuffle the data at each epoch
+            if shuffle:
+                shuffle_indices = np.random.permutation(np.arange(config.train_size))
+                shuffled_data_X, shuffled_data_y = self.X[shuffle_indices, :], self.y[shuffle_indices]
+            else:
+                shuffled_data_X, shuffled_data_y = self.X, self.y
+            for batch_num in range(num_batches_per_epoch):
+                start_index = batch_num * config.batch_size
+                end_index = min((batch_num + 1) * config.batch_size, config.train_size)
+                yield shuffled_data_X[start_index:end_index], shuffled_data_y[start_index:end_index]
+
 
 if __name__ == "__main__":
     t = Dataset()
-
-
