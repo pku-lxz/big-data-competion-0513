@@ -6,7 +6,8 @@ import tensorflow.contrib as tf_contrib
 import os
 import argparse
 from dataset import Dataset
-
+import pandas as pd
+import numpy as np
 
 class TextCNN:
     def __init__(self):
@@ -20,9 +21,15 @@ class TextCNN:
         with tf.variable_scope(name) as scope:
             W = tf.get_variable(initializer=tf.random_uniform([config.vocab_size, config.embeddingsize], -1.0, 1.0), name='W')
             embedded_chars = tf.nn.embedding_lookup(W, tf.cast(inp, tf.int32))
-        return embedded_chars[:, :, :, tf.newaxis]
+        return tf.cast(embedded_chars, tf.float32)
 
-    def _conv_layer(self, name, inp, kernel_shape, stride, padding='SAME',is_training=False):
+    def _lstm_layer(self, name, inp, rnn_size):
+        with tf.variable_scope(name) as scope:
+            lstm_cell = tf.nn.rnn_cell.LSTMCell(num_units=rnn_size)
+            hiddens, lstm_state = tf.nn.dynamic_rnn(cell=lstm_cell, inputs=inp, dtype=tf.float32)
+        return hiddens[:, :, :, tf.newaxis]
+
+    def _conv_layer(self, name, inp, kernel_shape, stride, padding='VALID', is_training=False):
         with tf.variable_scope(name) as scope:
             conv_filter = tf.get_variable(name='filter', shape=kernel_shape,
                                           initializer=self.weight_init, regularizer=self.reg)
@@ -35,13 +42,13 @@ class TextCNN:
             x = tf.nn.relu(x)
         return x
 
-    def _pool_layer(self, name, inp, ksize, stride, padding='SAME', mode='MAX'):
+    def _pool_layer(self, name, inp, ksize, stride, padding='VALID', mode='MAX'):
         assert mode in ['MAX', 'AVG'], 'the mode of pool must be MAX or AVG'
         if mode == 'MAX':
-            x = tf.nn.max_pool(inp, ksize=[1, ksize, 1, 1], strides=[1, stride, stride, 1],
+            x = tf.nn.max_pool(inp, ksize=[1, ksize, 1, 1], strides=[1, stride, 1, 1],
                                padding=padding, name=name, data_format='NHWC')
         elif mode == 'AVG':
-            x = tf.nn.avg_pool(inp, ksize=[1, ksize, 1, 1], strides=[1, stride, stride, 1],
+            x = tf.nn.avg_pool(inp, ksize=[1, ksize, 1, 1], strides=[1, stride, 1, 1],
                                padding=padding, name=name, data_format='NHWC')
         return x
 
@@ -65,16 +72,31 @@ class TextCNN:
         is_training = tf.placeholder(tf.bool, name='is_training')
 
         # embeding
-        x = self._embed_layer(name='embed_input', inp=data) # [batch_size, padding_length, embeding_length, channel=1]
+        x = self._embed_layer(name='embed_input', inp=data) # [batch_size, padding_length, embeding_length]
 
-        # conv
-        x = self._conv_layer(name='conv1', inp=x,
+        # bilstm
+        x = self._lstm_layer(name='lstm1', inp=x, rnn_size=config.embeddingsize)
+
+        # conv1
+        x_1 = self._conv_layer(name='conv1', inp=x,
                              kernel_shape=[1, config.embeddingsize, 1,  32], stride=1,
                              is_training=is_training)  # N*padding_length*1*32
-        x = self._pool_layer(name='pool1', inp=x, ksize=config.padding_size, stride=1, mode='MAX')  # Nx1x1x16
+        x_1 = self._pool_layer(name='pool1', inp=x_1, ksize=config.padding_size, stride=1, mode='MAX')  # Nx1x1x32
+
+        # conv2
+        x_2 = self._conv_layer(name='conv2', inp=x,
+                               kernel_shape=[2, config.embeddingsize, 1, 32], stride=1,
+                               is_training=is_training)  # N*padding_length*1*32
+        x_2 = self._pool_layer(name='pool2', inp=x_2, ksize=config.padding_size - 1, stride=1, mode='MAX')  # Nx1x1x16
+
+        # conv2
+        x_3 = self._conv_layer(name='conv3', inp=x,
+                               kernel_shape=[4, config.embeddingsize, 1, 32], stride=1,
+                               is_training=is_training)  # N*padding_length*1*32
+        x_3 = self._pool_layer(name='pool3', inp=x_3, ksize=config.padding_size - 3, stride=1, mode='MAX')  # Nx1x1x16
 
         # fc1
-        logits = self._fc_layer(name='fc1', inp=x, units=config.nr_class, dropout=0)
+        logits = self._fc_layer(name='fc1', inp=tf.concat([x_1, x_2, x_3], 3), units=config.nr_class, dropout=0)
 
         placeholders = {
             'data': data,
@@ -95,7 +117,9 @@ def main():
     network = TextCNN()
     placeholders, label_onehot, logits = network.build()
 
-    correct_pred = tf.equal(tf.cast(tf.argmax(tf.nn.softmax(logits), 1), dtype=tf.int32),
+    out = tf.nn.softmax(logits)
+
+    correct_pred = tf.equal(tf.cast(tf.argmax(out, 1), dtype=tf.int32),
                             tf.cast(tf.argmax(label_onehot, 1), dtype=tf.int32))
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
     loss_reg = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
@@ -114,12 +138,10 @@ def main():
     tf.summary.scalar('loss_crossEntropy', loss - loss_reg)
     tf.summary.scalar('loss', loss)
     tf.summary.scalar('accuracy', accuracy)
-    tf.summary.scalar('learning_rate', config.lr)
     merged = tf.summary.merge_all()
     train_writer = tf.summary.FileWriter(os.path.join(config.log_dir, 'tf_log', 'train'),
                                              tf.get_default_graph())
-    test_writer = tf.summary.FileWriter(os.path.join(config.log_dir, 'tf_log', 'test'),
-                                            tf.get_default_graph())
+
 
     ## create a session
     tf.set_random_seed(12345) # ensure consistent results
@@ -138,7 +160,7 @@ def main():
         ## training
         for epoch in range(epoch_start + 1, config.nr_epoch + 1):
             for _ in range(config.train_size//config.batch_size):
-                images, labels = data.one_batch_train()
+                images, labels = data.one_batch_train().__next__()
                 global_cnt += 1
                 feed_dict = {
                     placeholders['data']: images,
@@ -146,19 +168,15 @@ def main():
                     global_steps: global_cnt,
                     placeholders['is_training']: True,
                 }
-                _, loss_v, loss_reg_v, acc_v, lr_v, summary = sess.run([train, loss, loss_reg,
-                                                                        accuracy, config.lr, merged],
-                                                                       feed_dict=feed_dict)
+                _, loss_v, loss_reg_v, acc_v, summary = sess.run([train, loss, loss_reg, accuracy, merged], feed_dict=feed_dict)
                 if global_cnt % config.show_interval == 0:
                     train_writer.add_summary(summary, global_cnt)
                     print(
-                        "e:{},{}/{}".format(epoch, global_cnt % config.train_size//config.batch_size,
+                        "e:{},{}/{}".format(epoch, (global_cnt % config.train_size)//config.batch_size,
                                             config.train_size//config.batch_size),
                         'loss: {:.3f}'.format(loss_v),
                         'loss_reg: {:.3f}'.format(loss_reg_v),
-                        'acc: {:.3f}'.format(acc_v),
-                        'lr: {:.3f}'.format(lr_v),
-                    )
+                        'acc: {:.3f}'.format(acc_v))
 
             ## save model
             if epoch % config.snapshot_interval == 0:
@@ -166,10 +184,12 @@ def main():
                            global_step=global_cnt)
 
         print('Training is done, exit.')
+        return sess.run(out, feed_dict={placeholders['data']: data.test, global_steps: global_cnt,
+                    placeholders['is_training']: True})
 
 
 if __name__ == "__main__":
     try:
-        main()
+        pd.DataFrame({'ID': pd.read_csv(config.test_path)['ID'], 'Pred': np.array(main())[:, 1]}).to_csv(os.path.join(config.submission_path, "textCNN_max.csv"), index=False)
     except KeyboardInterrupt:
         os._exit(1)
