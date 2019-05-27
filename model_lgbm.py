@@ -1,8 +1,7 @@
 import lightgbm as lgb
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
-from data_word2vec import Dataset
-from ensemble import PredictProbilityOut
+from data_tfidf import Dataset
 import pandas as pd
 from common import config
 import os
@@ -52,9 +51,7 @@ class modelLightGBM:
 
 
 if __name__ == "__main__":
-    predict = PredictProbilityOut()
-    data = Dataset(read_model=True)
+    data = Dataset()
     print("#########LightGBM Prediction start!#########")
     gbm = modelLightGBM()
-    predict.update(gbm.train(data.train, data.train_y, data.test))
-    predict.subPredict(os.path.join(config.submission_path, "lgb.csv"), pd.read_csv(config.test_path))
+    gbm.train(data.X, data.y, data.test)
