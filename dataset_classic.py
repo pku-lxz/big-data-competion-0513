@@ -6,17 +6,28 @@ from scipy.sparse.csr import csr_matrix
 import scipy.sparse as sp
 from gensim.models import Word2Vec
 import re
+import pickle
 
 
 class Dataset:
-    def __init__(self, read_model=True):
+    def __init__(self, read_model=True, read_data=True):
         self.pattern = re.compile(r'(['u'\U0001F300-\U0001F64F'u'\U0001F680-\U0001F6FF'u'\u2600-\u2B55])', re.UNICODE)
         self.raw_data0, self.raw_data1 = self.data_preprocess(config.train_path)
         corpus = self.convert_([sentence.lower() for sentence in self.raw_data0['review']] + [sentence.lower() for sentence in pd.read_csv(config.test_path)['review'].values])
         self.y = np.array([{"Negative": 0, "Positive": 1}[label] for label in self.raw_data0["label"]])
-        tr, te = self.word2vec_data(config.model_path, read_model)
-        self.X = np.concatenate([corpus[:config.train_size + config.val_size], tr], axis=1)
-        self.test = np.concatenate([corpus[-config.test_size - 1:-1], te], axis=1)
+        tr, te = self.word2vec_data(config.word2vecmodel_path, read_model)
+        if read_data:
+            with open(config.data_classic_train_path, 'rb') as file:
+                self.X = pickle.load(file)
+            with open(config.data_classic_test_path, 'rb') as file:
+                self.test = pickle.load(file)
+        else:
+            self.X = np.concatenate([corpus[:config.train_size + config.val_size], tr], axis=1)
+            self.test = np.concatenate([corpus[-config.test_size - 1:-1], te], axis=1)
+            with open(config.data_classic_train_path, 'wb') as file:
+                pickle.dump(self.X, file)
+            with open(config.data_classic_test_path, 'wb') as file:
+                pickle.dump(self.test, file)
 
     def data_preprocess(self, path):
         with open(path) as f:
@@ -67,12 +78,12 @@ class Dataset:
     def word2vec_data(self, path, read):
         train_X = self.participle([sentence for sentence in self.raw_data1])
         test_X = self.participle(
-            [re.split(self.pattern, sentence) for sentence in pd.read_csv(config.test_path)["review"].values])
+            [re.split(self.pattern, sentence.lower()) for sentence in pd.read_csv(config.test_path)["review"].values])
         if not read:
-            model = Word2Vec(train_X + test_X, size=config.embeddingsize, workers=4)
+            model = Word2Vec(train_X + test_X, size=config.embeddingsize, workers=4, iter=config.word2vec_inter)
             model.save(path)
         else:
-            model = Word2Vec.load(config.model_path)
+            model = Word2Vec.load(config.word2vecmodel_path)
         tr = self.padding_sentences([self.convert_data(x, model) for x in train_X], config.padding_size)
         te = self.padding_sentences([self.convert_data(x, model) for x in test_X], config.padding_size)
         return tr, te
@@ -81,8 +92,8 @@ class Dataset:
     def convert_data(sentence, vocab_dic):
         data = np.zeros((len(sentence), config.embeddingsize))
         for idx, word in enumerate(sentence):
-            if word in vocab_dic:
-                data[idx, :] = vocab_dic[word]
+            if vocab_dic.wv.__contains__(word):
+                data[idx, :] = vocab_dic.wv.__getitem__(word)
         return data
 
     @staticmethod

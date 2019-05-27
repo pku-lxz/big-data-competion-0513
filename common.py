@@ -6,7 +6,9 @@ class config:
     path = "/Users/lamprad/Desktop/DATA/big-data-competition/"
     train_path = os.path.join(path, "train.csv")
     test_path = os.path.join(path, "test.csv")
-    model_path = os.path.join(path, "model")
+    word2vecmodel_path = os.path.join(path, "model")
+    data_classic_train_path = os.path.join(path, "train_classic.pickle")
+    data_classic_test_path = os.path.join(path, "test_classic.pickle")
     submission_path = os.path.join(path, "submission/")
     log_dir = os.path.join(path, 'train_log')
 

@@ -1,6 +1,6 @@
 import tensorflow as tf
 from common import config
-from dataset import Dataset
+from dataset_modern import Dataset
 import argparse
 from model_cnn import TextCNN
 from model_bilstm import BiLSTM
