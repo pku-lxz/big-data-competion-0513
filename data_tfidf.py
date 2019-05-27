@@ -10,7 +10,6 @@ class Dataset:
         corpus = [sentence.lower() for sentence in self.raw_data['review']] + [sentence.lower() for sentence in pd.read_csv(config.test_path)['review'].values]
         self.corpus = self.convert_(corpus)
         self.X, self.y, self.test = self.corpus[:config.train_size + config.val_size], np.array([{"Negative": 0, "Positive": 1}[label] for label in self.raw_data["label"]]), self.corpus[-config.test_size - 1:-1]
-        pass
 
     def data_preprocess(self, path):
         with open(path) as f:
@@ -40,6 +39,11 @@ class Dataset:
         np_feature_eng = np.concatenate([X, np.vstack(X.mean(axis=1))], axis=1)
         np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np_feature_eng.std(axis=1))], axis=1)
         np_feature_eng = np.concatenate([np_feature_eng, np.square(np_feature_eng)], axis=1)
+        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.max(np_feature_eng[:, :200], axis=1))], axis=1)
+
+        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.min(np_feature_eng[:, :200], axis=1))], axis=1)
+
+        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.percentile(np_feature_eng, 25, axis=1))], axis=1)
         return np_feature_eng
 
 
