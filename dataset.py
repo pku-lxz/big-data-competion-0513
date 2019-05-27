@@ -2,6 +2,7 @@ import pandas as pd
 from common import config
 import re
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 
 class Dataset:
@@ -9,10 +10,12 @@ class Dataset:
     def __init__(self):
         self.pattern = re.compile(r'(['u'\U0001F300-\U0001F64F'u'\U0001F680-\U0001F6FF'u'\u2600-\u2B55])', re.UNICODE)
         self.raw_data = self.data_preprocess(config.train_path)
-        self.y = np.array([{"Negative": 0, "Positive": 1}[label] for label in self.raw_data["label"].values])
         self.dic = self.vocab_dict()
-        self.X = self.padding_sentences([self.convert_data(x, self.dic) for x in self.participle([sentence for sentence in self.raw_data["review"].values])], config.padding_size)
-        self.test = self.padding_sentences([self.convert_data(x, self.dic) for x in self.participle([re.split(self.pattern, sentence) for sentence in pd.read_csv(config.test_path)["review"].values])], config.padding_size)
+        self.test = self.padding_sentences([self.convert_data(x, self.dic) for x in self.participle([re.split(self.pattern, sentence.lower()) for sentence in pd.read_csv(config.test_path)["review"].values])], config.padding_size)
+        self.X, self.x_val, self.y, self.y_val = train_test_split(
+                        self.padding_sentences([self.convert_data(x, self.dic) for x in self.participle([sentence for sentence in self.raw_data["review"].values])], config.padding_size),
+                        np.array([{"Negative": 0, "Positive": 1}[label] for label in self.raw_data["label"].values]),
+                        test_size=config.val_size)
 
     def data_preprocess(self, path):
         with open(path) as f:
@@ -30,7 +33,7 @@ class Dataset:
                             lines.pop(idx)
                     idx += 1
         df = {"ID": [line.split(",", 1)[0] for line in lines[1:]],
-              "review": [line.split(",", 1)[1][:-10] for line in lines[1:]],
+              "review": [line.split(",", 1)[1][:-10].lower() for line in lines[1:]],
               "label": [line.split(",", 1)[1][-9:-1] for line in lines[1:]]}
         participle = [re.split(self.pattern, review) for review in df["review"]]
         return pd.DataFrame({"ID": df["ID"], "review": participle, "label": df["label"]})
@@ -80,10 +83,27 @@ class Dataset:
 
     def one_batch_train(self, shuffle=True):
         """
-            Generates a batch iterator for a dataset.
-            """
+        Generates a batch iterator for a dataset.
+        """
         num_batches_per_epoch = int((config.train_size - 1) / config.batch_size) + 1
-        for epoch in range(config.epochs):
+        for epoch in range(config.nr_epoch):
+            # Shuffle the data at each epoch
+            if shuffle:
+                shuffle_indices = np.random.permutation(np.arange(config.train_size))
+                shuffled_data_X, shuffled_data_y = self.X[shuffle_indices, :], self.y[shuffle_indices]
+            else:
+                shuffled_data_X, shuffled_data_y = self.X, self.y
+            for batch_num in range(num_batches_per_epoch):
+                start_index = batch_num * config.batch_size
+                end_index = min((batch_num + 1) * config.batch_size, config.train_size)
+                yield shuffled_data_X[start_index:end_index], shuffled_data_y[start_index:end_index]
+
+    def one_batch_val(self, shuffle=False):
+        """
+        Generates a batch iterator for a dataset.
+        """
+        num_batches_per_epoch = int((config.val_size - 1) / config.batch_size) + 1
+        for epoch in range(config.nr_epoch):
             # Shuffle the data at each epoch
             if shuffle:
                 shuffle_indices = np.random.permutation(np.arange(config.train_size))

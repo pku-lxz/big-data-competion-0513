@@ -2,7 +2,7 @@ import lightgbm as lgb
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
 from data_word2vec import Dataset
-from train_predict import PredictProbilityOut
+from ensemble import PredictProbilityOut
 import pandas as pd
 from common import config
 import os

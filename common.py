@@ -10,25 +10,26 @@ class config:
     submission_path = os.path.join(path, "submission/")
     log_dir = os.path.join(path, 'train_log')
 
+    ensemble_path = os.path.join(submission_path, 'ensemble.csv')
     '''where to write model snapshots to'''
     log_model_dir = os.path.join(log_dir, 'models')
 
-    embeddingsize = 120
+    embeddingsize = 100
     word2vec_inter = 20000
-    padding_size = 31
+    padding_size = 35
 
-    train_size = 6328
+    train_size = 5728
+    val_size = 600
     test_size = 2712
-    batch_size = 64
-    epochs = 60
+    batch_size = 128
     weight_decay = 0.2
 
     shape = (padding_size, embeddingsize)
     nr_class = 2
-    nr_epoch = 20
+    nr_epoch = 60
 
-    vocab_size = 21645
-    lr = 0.01
-    show_interval = 50
-    test_interval = 100
+    vocab_size = 18144
+    lr = 0.001
+    show_interval = 30
+    test_interval = 5
     snapshot_interval = 5
