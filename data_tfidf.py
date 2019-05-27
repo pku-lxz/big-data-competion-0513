@@ -36,8 +36,19 @@ class Dataset:
     @staticmethod
     def convert_(corpus):
         vectorizer = TfidfVectorizer()
-        X = vectorizer.fit_transform(corpus)
-        return X
+        X = vectorizer.fit_transform(corpus).toarray()
+        np_feature_eng = np.concatenate([X, np.vstack(X.mean(axis=1))], axis=1)
+        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np_feature_eng.std(axis=1))], axis=1)
+        np_feature_eng = np.concatenate([np_feature_eng, np.square(np_feature_eng)], axis=1)
+        np_feature_eng = np.concatenate([np_feature_eng, np.sinh(np_feature_eng[:, :200])], axis=1)
+
+        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.max(np_feature_eng[:, :21869], axis=1))], axis=1)
+
+        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.min(np_feature_eng[:, :21869], axis=1))], axis=1)
+
+        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.percentile(np_feature_eng, 25, axis=1))], axis=1)
+
+        return np_feature_eng
 
 
 if __name__ == "__main__":
