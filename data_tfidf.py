@@ -1,14 +1,15 @@
 import pandas as pd
 from common import config
 from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy as np
 
 
 class Dataset:
     def __init__(self):
         self.raw_data = self.data_preprocess(config.train_path)
-        corpus = [sentence for sentence in self.raw_data['review']] + [sentence.lower() for sentence in pd.read_csv(config.test_path)['review'].values]
+        corpus = [sentence.lower() for sentence in self.raw_data['review']] + [sentence.lower() for sentence in pd.read_csv(config.test_path)['review'].values]
         self.corpus = self.convert_(corpus).toarray()
-        self.X, self.y, self.test = self.corpus[:config.train_size + config.val_size], self.raw_data['label'], self.corpus[-config.test_size - 1:-1]
+        self.X, self.y, self.test = self.corpus[:config.train_size + config.val_size], np.array([{"Negative": 0, "Positive": 1}[label] for label in self.raw_data["label"]]), self.corpus[-config.test_size - 1:-1]
         pass
 
     def data_preprocess(self, path):
