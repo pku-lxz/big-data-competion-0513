@@ -59,5 +59,5 @@ class model:
 if __name__ == "__main__":
     data = Dataset()
     mlmodel = model(data.X, data.y, data.test)
-    mlmodel._lgb()
+    mlmodel._lr()
 

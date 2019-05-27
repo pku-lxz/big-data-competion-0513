@@ -39,12 +39,10 @@ class Dataset:
         X = vectorizer.fit_transform(corpus)
         np_feature_eng = sp.hstack([X, csr_matrix.max(X, axis=1)])
         np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.min(X, axis=1)])
-        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.mean(X, axis=1)])
-        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.argmax(X, axis=1)])
-        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.argmin(X, axis=1)])
-        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.argmax(X, axis=1)]).toarray()
+        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.mean(X, axis=1)]).toarray()
         np_feature_eng = np.concatenate([np_feature_eng, np.square(np_feature_eng)], axis=1)
         np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np_feature_eng.std(axis=1))], axis=1)
+        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.percentile(np_feature_eng, 25, axis=1))], axis=1)
         return np_feature_eng
 
 
