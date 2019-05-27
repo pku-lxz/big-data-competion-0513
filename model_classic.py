@@ -46,7 +46,7 @@ class model:
             X_train, y_train = self.X[trn_idx, :], self.y[trn_idx]
             X_val, y_val = self.X[val_idx, :], self.y[val_idx]
 
-            model = LogisticRegression()
+            model = LogisticRegression(random_state=0, solver='lbfgs', multi_class='multinomial', C=0.1, max_iter=100000)
             print('Start training...')
             model.fit(X_train, y_train)
             print("\n**************Validation results****************")
