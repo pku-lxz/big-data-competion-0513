@@ -2,7 +2,8 @@ import pandas as pd
 from common import config
 from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
-
+from scipy.sparse.csr import csr_matrix
+import scipy.sparse as sp
 
 class Dataset:
     def __init__(self):
@@ -35,15 +36,15 @@ class Dataset:
     @staticmethod
     def convert_(corpus):
         vectorizer = TfidfVectorizer()
-        X = vectorizer.fit_transform(corpus).toarray()
-        np_feature_eng = np.concatenate([X, np.vstack(X.mean(axis=1))], axis=1)
-        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np_feature_eng.std(axis=1))], axis=1)
+        X = vectorizer.fit_transform(corpus)
+        np_feature_eng = sp.hstack([X, csr_matrix.max(X, axis=1)])
+        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.min(X, axis=1)])
+        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.mean(X, axis=1)])
+        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.argmax(X, axis=1)])
+        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.argmin(X, axis=1)])
+        np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.argmax(X, axis=1)]).toarray()
         np_feature_eng = np.concatenate([np_feature_eng, np.square(np_feature_eng)], axis=1)
-        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.max(np_feature_eng[:, :200], axis=1))], axis=1)
-
-        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.min(np_feature_eng[:, :200], axis=1))], axis=1)
-
-        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.percentile(np_feature_eng, 25, axis=1))], axis=1)
+        np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np_feature_eng.std(axis=1))], axis=1)
         return np_feature_eng
 
 
