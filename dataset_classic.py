@@ -7,6 +7,7 @@ import scipy.sparse as sp
 from gensim.models import Word2Vec
 import re
 import pickle
+from sklearn.decomposition import PCA
 
 
 class Dataset:
@@ -57,6 +58,9 @@ class Dataset:
         np_feature_eng = sp.hstack([X, csr_matrix.max(X, axis=1)])
         np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.min(X, axis=1)])
         np_feature_eng = sp.hstack([np_feature_eng, csr_matrix.mean(X, axis=1)]).toarray()
+        pca = PCA(n_components=config.components)
+        pca.fit(np_feature_eng)
+        np_feature_eng = pca.transform(np_feature_eng)
         np_feature_eng = np.concatenate([np_feature_eng, np.square(np_feature_eng)], axis=1)
         np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np_feature_eng.std(axis=1))], axis=1)
         np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.percentile(np_feature_eng, 25, axis=1))], axis=1)
@@ -72,7 +76,7 @@ class Dataset:
                     new_sentence.extend([char for char in re.split(r'(\w+)', word) if char])
                 elif word:
                     new_sentence.append(word)
-            new_sentences.append([char for char in new_sentence if char != " "])
+            new_sentences.append([char for char in new_sentence if char not in ['      ', '… ', '"', '.', ' ', '" ', '."', ',"', ', ', ' , ', ',', '. ', '.  ', '"""', '"" ']])
         return new_sentences
 
     def word2vec_data(self, path, read):
@@ -84,8 +88,8 @@ class Dataset:
             model.save(path)
         else:
             model = Word2Vec.load(config.word2vecmodel_path)
-        tr = self.padding_sentences([self.convert_data(x, model) for x in train_X], config.padding_size)
-        te = self.padding_sentences([self.convert_data(x, model) for x in test_X], config.padding_size)
+        tr = self.padding_sentences([self.convert_data(x, model) for x in train_X])
+        te = self.padding_sentences([self.convert_data(x, model) for x in test_X])
         return tr, te
 
     @staticmethod
@@ -97,15 +101,15 @@ class Dataset:
         return data
 
     @staticmethod
-    def padding_sentences(sentences, length):
-        paddles = np.zeros((len(sentences), length * config.embeddingsize))
+    def padding_sentences(sentences):
+        paddles = np.zeros((len(sentences), config.padding_size * config.embeddingsize))
         for i, sentence in enumerate(sentences):
-            if length > sentence.shape[0]:
-                paddle = np.concatenate((sentence, np.zeros((length - sentence.shape[0], config.embeddingsize))),
+            if config.padding_size > sentence.shape[0]:
+                paddle = np.concatenate((sentence, np.zeros((config.padding_size - sentence.shape[0], config.embeddingsize))),
                                         axis=0)
                 paddles[i, :] = paddle.reshape((1, -1))
-            elif length < sentence.shape[0]:
-                paddle = sentence[:length]
+            elif config.padding_size < sentence.shape[0]:
+                paddle = sentence[:config.padding_size]
                 paddles[i, :] = paddle.reshape((1, -1))
             else:
                 paddles[i, :] = sentence.reshape((1, -1))
