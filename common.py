@@ -16,10 +16,10 @@ class config:
     '''where to write model snapshots to'''
     log_model_dir = os.path.join(log_dir, 'models')
 
-    embeddingsize = 100
-    word2vec_inter = 20000
-    padding_size = 35
-    components = 5000
+    embeddingsize = 200
+    word2vec_inter = 80000
+    padding_size = 25
+    components = 6000
 
     train_size = 5728
     val_size = 600

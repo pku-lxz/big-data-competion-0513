@@ -14,15 +14,18 @@ class Dataset:
     def __init__(self, read_model=True, read_data=True):
         self.pattern = re.compile(r'(['u'\U0001F300-\U0001F64F'u'\U0001F680-\U0001F6FF'u'\u2600-\u2B55])', re.UNICODE)
         self.raw_data0, self.raw_data1 = self.data_preprocess(config.train_path)
-        corpus = self.convert_([sentence.lower() for sentence in self.raw_data0['review']] + [sentence.lower() for sentence in pd.read_csv(config.test_path)['review'].values])
         self.y = np.array([{"Negative": 0, "Positive": 1}[label] for label in self.raw_data0["label"]])
-        tr, te = self.word2vec_data(config.word2vecmodel_path, read_model)
         if read_data:
             with open(config.data_classic_train_path, 'rb') as file:
                 self.X = pickle.load(file)
             with open(config.data_classic_test_path, 'rb') as file:
                 self.test = pickle.load(file)
         else:
+            corpus = self.convert_tfidf(
+                [sentence.lower() for sentence in self.raw_data0['review']] + [sentence.lower() for sentence in
+                                                                               pd.read_csv(config.test_path)[
+                                                                                   'review'].values])
+            tr, te = self.word2vec_data(config.word2vecmodel_path, read_model)
             self.X = np.concatenate([corpus[:config.train_size + config.val_size], tr], axis=1)
             self.test = np.concatenate([corpus[-config.test_size - 1:-1], te], axis=1)
             with open(config.data_classic_train_path, 'wb') as file:
@@ -52,7 +55,7 @@ class Dataset:
         return df, participle
 
     @staticmethod
-    def convert_(corpus):
+    def convert_tfidf(corpus):
         vectorizer = TfidfVectorizer()
         X = vectorizer.fit_transform(corpus)
         np_feature_eng = sp.hstack([X, csr_matrix.max(X, axis=1)])
@@ -61,7 +64,6 @@ class Dataset:
         pca = PCA(n_components=config.components)
         pca.fit(np_feature_eng)
         np_feature_eng = pca.transform(np_feature_eng)
-        np_feature_eng = np.concatenate([np_feature_eng, np.square(np_feature_eng)], axis=1)
         np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np_feature_eng.std(axis=1))], axis=1)
         np_feature_eng = np.concatenate([np_feature_eng, np.vstack(np.percentile(np_feature_eng, 25, axis=1))], axis=1)
         return np_feature_eng
